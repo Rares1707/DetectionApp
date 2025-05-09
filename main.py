@@ -6,7 +6,6 @@ import torch
 import pydicom
 import cv2
 import numpy as np
-import pickle
 from torchvision.models.detection import fcos_resnet50_fpn
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 
@@ -14,6 +13,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QLabel,
     QPushButton,
+    QRadioButton,
     QFileDialog,
     QVBoxLayout,
     QWidget,
@@ -30,19 +30,44 @@ class DetrApp(QWidget):
         self.image_folder = None
         self.image_files = []
         self.current_index = 0
-        self.model = model = fcos_resnet50_fpn(trainable_backbone_layers=5)
-        model.transform = GeneralizedRCNNTransform(
+        # self.load_t2_model()
+
+    def load_t2_model(self):
+        if not self.t2_radio_btn.isChecked():
+            return
+        self.model = fcos_resnet50_fpn(trainable_backbone_layers=5)
+        self.model.transform = GeneralizedRCNNTransform(
             min_size=(256,),
             max_size=256,
             image_mean=[0.2341376394033432, 0.2341376394033432, 0.2341376394033432],
             image_std=[0.2010965347290039, 0.2010965347290039, 0.2010965347290039],
         )
-        self.model.load_state_dict(torch.load("model.pth", map_location="cpu"))
+        self.model.load_state_dict(
+            torch.load("checkpoints/t2_model.pth", map_location="cpu")
+        )
         self.model.eval()
-        print("model loaded")
+        self.model_type = "t2"
+        print("t2 model loaded")
+
+    def load_dwi_model(self):
+        if not self.dwi_radio_btn.isChecked():
+            return
+        self.model = fcos_resnet50_fpn(trainable_backbone_layers=5)
+        self.model.transform = GeneralizedRCNNTransform(
+            min_size=(1024,),
+            max_size=1333,
+            image_mean=[0.09608025848865509, 0.09608025848865509, 0.09608025848865509],
+            image_std=[0.10761009901762009, 0.10761009901762009, 0.10761009901762009],
+        )
+        self.model.load_state_dict(
+            torch.load("checkpoints/dwi_model.pth", map_location="cpu")
+        )
+        self.model.eval()
+        self.model_type = "dwi"
+        print("dwi model loaded")
 
     def initUI(self):
-        self.setWindowTitle("DETR Object Detection")
+        self.setWindowTitle("Cervical Cancer Detection")
         self.setGeometry(200, 100, 700, 500)
         self.setStyleSheet(
             """
@@ -68,6 +93,10 @@ class DetrApp(QWidget):
         self.status_label = QLabel("Select a folder to detect objects", self)
         self.status_label.setAlignment(Qt.AlignCenter)
 
+        # Type Label
+        self.image_type_label = QLabel("Choose image type", self)
+        self.image_type_label.setAlignment(Qt.AlignCenter)
+
         # Buttons
         self.select_folder_btn = QPushButton("Choose Folder", self)
         self.select_folder_btn.clicked.connect(self.load_folder)
@@ -80,10 +109,21 @@ class DetrApp(QWidget):
         self.next_btn.clicked.connect(self.show_next_image)
         self.next_btn.setEnabled(False)
 
+        self.t2_radio_btn = QRadioButton("T2", self)
+        self.t2_radio_btn.toggled.connect(self.load_t2_model)
+        self.t2_radio_btn.setChecked(True)
+
+        self.dwi_radio_btn = QRadioButton("DWI", self)
+        self.dwi_radio_btn.toggled.connect(self.load_dwi_model)
+        self.dwi_radio_btn.setChecked(False)
+
         # Layouts
         layout = QVBoxLayout()
         layout.addWidget(self.title)
         layout.addWidget(self.image_label)
+        layout.addWidget(self.image_type_label)
+        layout.addWidget(self.t2_radio_btn)
+        layout.addWidget(self.dwi_radio_btn)
         layout.addWidget(self.status_label)
 
         btn_layout = QHBoxLayout()
@@ -150,7 +190,12 @@ class DetrApp(QWidget):
                 predictions["boxes"], predictions["labels"], predictions["scores"]
             ):
                 score = float(score)
-                if score >= 0.2:
+                if self.model_type == "t2":
+                    min_score = 0.2
+                elif self.model_type == "dwi":
+                    min_score = 0.5
+
+                if score >= min_score:
                     color = (0, 255, 0)
                     if label == 2:
                         color = (255, 0, 0)

@@ -1,3 +1,10 @@
+doodles.py
+
+# Project resources
+checkpoints/
+t2_sample/
+dwi_sample/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

@@ -7,7 +7,8 @@ from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.transforms import v2
 
 from repository import Repository
-from project_constants import (
+from utils.subject import Subject
+from utils.project_constants import (
     T2_DETECTION_MODEL,
     T2_MODEL_TYPE,
     T2_IOU_THRESHOLD,
@@ -21,8 +22,9 @@ from project_constants import (
 )
 
 
-class Service:
+class Service(Subject):
     def __init__(self, repository: Repository):
+        super().__init__()
         self._repository = repository
         self._model = None
         self._model_type = None
@@ -62,9 +64,6 @@ class Service:
     def get_image_count(self):
         return len(self._repository)
 
-    def get_image_path(self, image_index):
-        return self._repository.get_image_path(image_index)
-
     def _plot_predictions(self, image, predictions):
         image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
         image = image.astype(np.uint8)
@@ -102,7 +101,7 @@ class Service:
         return image
 
     def process_image(self, image_index):
-        image = self._repository.get_image(image_index)
+        image = self._repository.get_dicom_image(image_index)
 
         # Prepare the inference image by bringing it to [0, 1],
         # replicating it across the 3 channels and applying the transforms
@@ -135,6 +134,9 @@ class Service:
         for i in range(len(self._repository)):
             image = self.process_image(i)
             self._repository.save_image_to_output_folder(image, i)
+            self.notify_observers(
+                processed_image_count=i + 1, total_image_count=len(self._repository)
+            )
 
     def set_output_folder(self, folder_path):
         self._repository.set_output_folder(folder_path)

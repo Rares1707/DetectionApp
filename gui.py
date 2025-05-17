@@ -1,3 +1,6 @@
+from typing import override
+from functools import wraps
+
 from PySide6.QtWidgets import (
     QApplication,
     QLabel,
@@ -7,20 +10,23 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QHBoxLayout,
+    QMessageBox,
 )
 from PySide6.QtGui import QPixmap, QFont, QImage
 from PySide6.QtCore import Qt
 
 from service import Service
+from utils.observer import Observer
+from utils.catch_exceptions_decorator import catch_exceptions
 
 
-class DetrApp(QWidget):
+class MainWindow(QWidget, Observer):
     def __init__(self, service: Service):
         super().__init__()
         self._service = service
         self._current_index = 0
+        self._message_box = QMessageBox()
         self.initUI()
-        # self.load_t2_model()
 
     def initUI(self):
         self.setWindowTitle("Cervical Cancer Detection")
@@ -34,7 +40,7 @@ class DetrApp(QWidget):
         """
         )
 
-        self.title = QLabel("DETR Object Detection", self)
+        self.title = QLabel("Cervical Cancer Detection", self)
         self.title.setFont(QFont("Arial", 18, QFont.Bold))
         self.title.setAlignment(Qt.AlignCenter)
 
@@ -43,7 +49,7 @@ class DetrApp(QWidget):
         self.image_label.setStyleSheet("border: 2px dashed white; padding: 10px;")
         self.image_label.setFixedSize(512, 512)
 
-        self.status_label = QLabel("Select a folder to detect objects", self)
+        self.status_label = QLabel("Select an output folder", self)
         self.status_label.setAlignment(Qt.AlignCenter)
 
         self.image_type_label = QLabel("Choose image type", self)
@@ -53,7 +59,7 @@ class DetrApp(QWidget):
         self.select_output_folder_btn.clicked.connect(self.choose_output_folder)
 
         self.select_input_folder_btn = QPushButton("Choose Input Folder", self)
-        self.select_input_folder_btn.clicked.connect(self.load_folder)
+        self.select_input_folder_btn.clicked.connect(self.choose_input_folder)
 
         self.prev_btn = QPushButton("Previous", self)
         self.prev_btn.clicked.connect(self.show_previous_image)
@@ -65,7 +71,7 @@ class DetrApp(QWidget):
 
         self.t2_radio_btn = QRadioButton("T2", self)
         self.t2_radio_btn.toggled.connect(self.load_t2_model)
-        self.t2_radio_btn.setChecked(True)
+        self.t2_radio_btn.setChecked(False)
 
         self.dwi_radio_btn = QRadioButton("DWI", self)
         self.dwi_radio_btn.toggled.connect(self.load_dwi_model)
@@ -89,6 +95,19 @@ class DetrApp(QWidget):
         layout.setAlignment(Qt.AlignCenter)
         self.setLayout(layout)
 
+    @override
+    def refresh(self, **kwargs):
+        processed_images_count = kwargs.get("processed_image_count")
+        total_image_count = kwargs.get("total_image_count")
+
+        if processed_images_count is None or total_image_count is None:
+            return
+
+        self.status_label.setText(
+            f"Processing images... ({processed_images_count+1}/{total_image_count})"
+        )
+        QApplication.processEvents()
+
     def load_t2_model(self):
         if not self.t2_radio_btn.isChecked():
             return
@@ -99,30 +118,38 @@ class DetrApp(QWidget):
             return
         self._service.load_dwi_model()
 
+    @catch_exceptions
     def choose_output_folder(self):
-        folder_path = QFileDialog.getExistingDirectory(self, "Select Output Folder")
-        self._service.set_output_folder(folder_path)
-        self.status_label.setText(f"Output folder set to: {folder_path}")
+        try:
+            folder_path = QFileDialog.getExistingDirectory(self, "Select output folder")
+            self._service.set_output_folder(folder_path)
+            self.status_label.setText(f"Output folder set. Now select an input folder.")
+        except ValueError as exception:
+            self._message_box.setText(str(exception))
+            self._message_box.exec()
 
-    def load_folder(self):
-        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
+    @catch_exceptions
+    def choose_input_folder(self):
+        """ "
+        Careful, this method also starts the inference process.
+        """
+        folder_path = QFileDialog.getExistingDirectory(self, "Select input folder")
         self._service.set_image_folder(folder_path)
-        self._service.process_all_images()
+        self.process_all_images()
 
-        # TODO:
-        # self.service.process_all_images() # this should also save the images to the output folder
-        # modify show_image to just load the image from the output folder (don't forget to keep the layered architecture principle)
+    def process_all_images(self):
+        self.status_label.setText("Processing first image...")
+        QApplication.processEvents()
+
+        self._service.process_all_images()
 
         self._current_index = 0
         self.show_image()
         self.next_btn.setEnabled(self._service.get_image_count() > 1)
         self.prev_btn.setEnabled(False)
 
+    @catch_exceptions
     def show_image(self):
-        self.status_label.setText("Processing image...")
-        QApplication.processEvents()
-
-        # image = self._service.process_image(self._current_index)
         image = self._service.get_processed_image(self._current_index)
 
         # Convert the image to QPixmap
@@ -136,21 +163,23 @@ class DetrApp(QWidget):
         )
 
         self.status_label.setText(
-            f"Detection complete! ({self._current_index + 1}/{self._service.get_image_count()})"
+            f"Done! Showing image {self._current_index + 1}/{self._service.get_image_count()}"
         )
 
     def show_next_image(self):
-        if self._current_index < self._service.get_image_count() - 1:
-            self._current_index += 1
-            self.show_image()
-            self.prev_btn.setEnabled(True)
-            if self._current_index == self._service.get_image_count() - 1:
-                self.next_btn.setEnabled(False)
+        if self._current_index >= self._service.get_image_count() - 1:
+            return
+        self._current_index += 1
+        self.show_image()
+        self.prev_btn.setEnabled(True)
+        if self._current_index == self._service.get_image_count() - 1:
+            self.next_btn.setEnabled(False)
 
     def show_previous_image(self):
-        if self._current_index > 0:
-            self._current_index -= 1
-            self.show_image()
-            self.next_btn.setEnabled(True)
-            if self._current_index == 0:
-                self.prev_btn.setEnabled(False)
+        if self._current_index <= 0:
+            return
+        self._current_index -= 1
+        self.show_image()
+        self.next_btn.setEnabled(True)
+        if self._current_index == 0:
+            self.prev_btn.setEnabled(False)

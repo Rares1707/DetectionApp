@@ -14,6 +14,9 @@ class Repository:
     def output_folder_is_set(self):
         return self._output_folder is not None
 
+    def get_output_image_name(self, image_index):
+        return f"{image_index + 1}.png"
+
     def set_image_folder(self, folder_path):
         if folder_path is None or not os.path.isdir(folder_path):
             raise ValueError("Invalid folder path provided.")
@@ -31,20 +34,16 @@ class Repository:
         self._image_files.sort()
 
     def save_image_to_output_folder(self, image, image_index):
-        output_path = f"{self._output_folder}/{image_index}.png"
+        output_path = f"{self._output_folder}/{self.get_output_image_name(image_index)}"
         cv2.imwrite(output_path, image)
 
-    def get_image_path(self, image_index):
+    def get_dicom_image(self, image_index):
         if len(self._image_files) <= 0:
             raise ValueError("No images found in the folder.")
-
         if image_index < 0 or image_index >= len(self._image_files):
             raise IndexError("Image index out of range.")
 
-        return os.path.join(self._image_folder, self._image_files[image_index])
-
-    def get_image(self, image_index):
-        image_path = self.get_image_path(image_index)
+        image_path = os.path.join(self._image_folder, self._image_files[image_index])
         return pydicom.dcmread(image_path).pixel_array
 
     def set_output_folder(self, folder_path):
@@ -69,7 +68,9 @@ class Repository:
         if image_index < 0 or image_index >= output_folder_length:
             raise IndexError("Image index out of range.")
 
-        image_path = os.path.join(self._output_folder, f"{image_index}.png")
+        image_path = os.path.join(
+            self._output_folder, self.get_output_image_name(image_index)
+        )
         return cv2.imread(image_path)
 
     def __len__(self):

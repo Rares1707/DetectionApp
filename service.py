@@ -23,47 +23,47 @@ from project_constants import (
 
 class Service:
     def __init__(self, repository: Repository):
-        self.repository = repository
-        self.model = None
-        self.model_type = None
-        self.min_iou_threshold = None
+        self._repository = repository
+        self._model = None
+        self._model_type = None
+        self._min_iou_threshold = None
 
     def load_t2_model(self):
-        self.model = fcos_resnet50_fpn(trainable_backbone_layers=5)
-        self.model.transform = GeneralizedRCNNTransform(
+        self._model = fcos_resnet50_fpn(trainable_backbone_layers=5)
+        self._model.transform = GeneralizedRCNNTransform(
             min_size=(256,),
             max_size=256,
             image_mean=T2_IMAGE_MEAN,
             image_std=T2_IMAGE_STD,
         )
-        self.model.load_state_dict(torch.load(T2_DETECTION_MODEL, map_location="cpu"))
-        self.model.eval()
-        self.model_type = T2_MODEL_TYPE
-        self.min_iou_threshold = T2_IOU_THRESHOLD
+        self._model.load_state_dict(torch.load(T2_DETECTION_MODEL, map_location="cpu"))
+        self._model.eval()
+        self._model_type = T2_MODEL_TYPE
+        self._min_iou_threshold = T2_IOU_THRESHOLD
         print("T2 model loaded")
 
     def load_dwi_model(self):
-        self.model = fcos_resnet50_fpn(trainable_backbone_layers=5)
-        self.model.transform = GeneralizedRCNNTransform(
+        self._model = fcos_resnet50_fpn(trainable_backbone_layers=5)
+        self._model.transform = GeneralizedRCNNTransform(
             min_size=(1024,),
             max_size=1333,
             image_mean=DWI_IMAGE_MEAN,
             image_std=DWI_IMAGE_STD,
         )
-        self.model.load_state_dict(torch.load(DWI_DETECTION_MODEL, map_location="cpu"))
-        self.model.eval()
-        self.model_type = DWI_MODEL_TYPE
-        self.min_iou_threshold = DWI_IOU_THRESHOLD
+        self._model.load_state_dict(torch.load(DWI_DETECTION_MODEL, map_location="cpu"))
+        self._model.eval()
+        self._model_type = DWI_MODEL_TYPE
+        self._min_iou_threshold = DWI_IOU_THRESHOLD
         print("DWI model loaded")
 
     def set_image_folder(self, folder_path):
-        self.repository.set_image_folder(folder_path)
+        self._repository.set_image_folder(folder_path)
 
     def get_image_count(self):
-        return len(self.repository)
+        return len(self._repository)
 
     def get_image_path(self, image_index):
-        return self.repository.get_image_path(image_index)
+        return self._repository.get_image_path(image_index)
 
     def _plot_predictions(self, image, predictions):
         image = cv2.normalize(image, None, 0, 255, cv2.NORM_MINMAX)
@@ -75,9 +75,9 @@ class Service:
             predictions["boxes"], predictions["labels"], predictions["scores"]
         ):
             score = float(score)
-            if self.model_type == T2_MODEL_TYPE:
+            if self._model_type == T2_MODEL_TYPE:
                 min_score = 0.2
-            elif self.model_type == DWI_MODEL_TYPE:
+            elif self._model_type == DWI_MODEL_TYPE:
                 min_score = 0.5
 
             if score < min_score:
@@ -102,7 +102,7 @@ class Service:
         return image
 
     def process_image(self, image_index):
-        image = self.repository.get_image(image_index)
+        image = self._repository.get_image(image_index)
 
         # Prepare the inference image by bringing it to [0, 1],
         # replicating it across the 3 channels and applying the transforms
@@ -123,10 +123,21 @@ class Service:
         inference_image = transform(inference_image)
 
         # Get predictions and plot them on the original image
-        predictions = self.model([inference_image])[0]
+        predictions = self._model([inference_image])[0]
         plotted_image = self._plot_predictions(image, predictions)
 
         return plotted_image
 
+    def process_all_images(self):
+        if self._repository.output_folder_is_set() is False:
+            raise ValueError("Output folder is not set. Please set it first.")
+
+        for i in range(len(self._repository)):
+            image = self.process_image(i)
+            self._repository.save_image_to_output_folder(image, i)
+
     def set_output_folder(self, folder_path):
-        self.repository.set_output_folder(folder_path)
+        self._repository.set_output_folder(folder_path)
+
+    def get_processed_image(self, image_index):
+        return self._repository.get_processed_image(image_index)

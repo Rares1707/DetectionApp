@@ -4,6 +4,7 @@ doodles.py
 checkpoints/
 t2_sample/
 dwi_sample/
+output/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

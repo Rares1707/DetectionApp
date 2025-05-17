@@ -17,8 +17,8 @@ from service import Service
 class DetrApp(QWidget):
     def __init__(self, service: Service):
         super().__init__()
-        self.service = service
-        self.current_index = 0
+        self._service = service
+        self._current_index = 0
         self.initUI()
         # self.load_t2_model()
 
@@ -92,32 +92,38 @@ class DetrApp(QWidget):
     def load_t2_model(self):
         if not self.t2_radio_btn.isChecked():
             return
-        self.service.load_t2_model()
+        self._service.load_t2_model()
 
     def load_dwi_model(self):
         if not self.dwi_radio_btn.isChecked():
             return
-        self.service.load_dwi_model()
+        self._service.load_dwi_model()
 
     def choose_output_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Output Folder")
-        self.service.set_output_folder(folder_path)
+        self._service.set_output_folder(folder_path)
         self.status_label.setText(f"Output folder set to: {folder_path}")
 
     def load_folder(self):
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder")
-        self.service.set_image_folder(folder_path)
+        self._service.set_image_folder(folder_path)
+        self._service.process_all_images()
 
-        self.current_index = 0
+        # TODO:
+        # self.service.process_all_images() # this should also save the images to the output folder
+        # modify show_image to just load the image from the output folder (don't forget to keep the layered architecture principle)
+
+        self._current_index = 0
         self.show_image()
-        self.next_btn.setEnabled(self.service.get_image_count() > 1)
+        self.next_btn.setEnabled(self._service.get_image_count() > 1)
         self.prev_btn.setEnabled(False)
 
     def show_image(self):
         self.status_label.setText("Processing image...")
         QApplication.processEvents()
 
-        image = self.service.process_image(self.current_index)
+        # image = self._service.process_image(self._current_index)
+        image = self._service.get_processed_image(self._current_index)
 
         # Convert the image to QPixmap
         height, width, channel = image.shape
@@ -130,21 +136,21 @@ class DetrApp(QWidget):
         )
 
         self.status_label.setText(
-            f"Detection complete! ({self.current_index + 1}/{self.service.get_image_count()})"
+            f"Detection complete! ({self._current_index + 1}/{self._service.get_image_count()})"
         )
 
     def show_next_image(self):
-        if self.current_index < self.service.get_image_count() - 1:
-            self.current_index += 1
+        if self._current_index < self._service.get_image_count() - 1:
+            self._current_index += 1
             self.show_image()
             self.prev_btn.setEnabled(True)
-            if self.current_index == self.service.get_image_count() - 1:
+            if self._current_index == self._service.get_image_count() - 1:
                 self.next_btn.setEnabled(False)
 
     def show_previous_image(self):
-        if self.current_index > 0:
-            self.current_index -= 1
+        if self._current_index > 0:
+            self._current_index -= 1
             self.show_image()
             self.next_btn.setEnabled(True)
-            if self.current_index == 0:
+            if self._current_index == 0:
                 self.prev_btn.setEnabled(False)

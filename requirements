@@ -1,2 +1,6 @@
 pyside6
 pyinstaller
+torch 
+torchvision
+opencv-python
+pydicom

@@ -6,6 +6,7 @@ from repository import Repository
 from service import Service
 from gui import MainWindow
 
+# TODO: switch to GPU if available (let's see how you test it though, maybe use another machine?)
 if __name__ == "__main__":
     repository = Repository()
     service = Service(repository)

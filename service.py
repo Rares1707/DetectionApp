@@ -10,15 +10,17 @@ from repository import Repository
 from utils.subject import Subject
 from utils.project_constants import (
     T2_DETECTION_MODEL,
-    T2_MODEL_TYPE,
+    T2_IMAGE,
     T2_IOU_THRESHOLD,
-    T2_IMAGE_MEAN,
-    T2_IMAGE_STD,
+    T2_DETECTION_IMAGE_MEAN,
+    T2_DETECTION_IMAGE_STD,
     DWI_DETECTION_MODEL,
-    DWI_MODEL_TYPE,
+    DWI_IMAGE,
     DWI_IOU_THRESHOLD,
-    DWI_IMAGE_MEAN,
-    DWI_IMAGE_STD,
+    DWI_DETECTION_IMAGE_MEAN,
+    DWI_DETECTION_IMAGE_STD,
+    DETECTION_TASK,
+    CLASSIFICATION_TASK,
 )
 
 
@@ -26,37 +28,40 @@ class Service(Subject):
     def __init__(self, repository: Repository):
         super().__init__()
         self._repository = repository
-        self._model = None
         self._model_type = None
         self._min_iou_threshold = None
 
-    def load_t2_model(self):
-        self._model = fcos_resnet50_fpn(trainable_backbone_layers=5)
-        self._model.transform = GeneralizedRCNNTransform(
+    def load_t2_detection_model(self):
+        model = fcos_resnet50_fpn(trainable_backbone_layers=5)
+        model.transform = GeneralizedRCNNTransform(
             min_size=(256,),
             max_size=256,
-            image_mean=T2_IMAGE_MEAN,
-            image_std=T2_IMAGE_STD,
+            image_mean=T2_DETECTION_IMAGE_MEAN,
+            image_std=T2_DETECTION_IMAGE_STD,
         )
-        self._model.load_state_dict(torch.load(T2_DETECTION_MODEL, map_location="cpu"))
-        self._model.eval()
-        self._model_type = T2_MODEL_TYPE
+        model.load_state_dict(torch.load(T2_DETECTION_MODEL, map_location="cpu"))
+        model.eval()
+
+        self._model_type = T2_IMAGE
         self._min_iou_threshold = T2_IOU_THRESHOLD
         print("T2 model loaded")
+        return model
 
-    def load_dwi_model(self):
-        self._model = fcos_resnet50_fpn(trainable_backbone_layers=5)
-        self._model.transform = GeneralizedRCNNTransform(
+    def load_dwi_detection_model(self):
+        model = fcos_resnet50_fpn(trainable_backbone_layers=5)
+        model.transform = GeneralizedRCNNTransform(
             min_size=(1024,),
             max_size=1333,
-            image_mean=DWI_IMAGE_MEAN,
-            image_std=DWI_IMAGE_STD,
+            image_mean=DWI_DETECTION_IMAGE_MEAN,
+            image_std=DWI_DETECTION_IMAGE_STD,
         )
-        self._model.load_state_dict(torch.load(DWI_DETECTION_MODEL, map_location="cpu"))
-        self._model.eval()
-        self._model_type = DWI_MODEL_TYPE
+        model.load_state_dict(torch.load(DWI_DETECTION_MODEL, map_location="cpu"))
+        model.eval()
+
+        self._model_type = DWI_IMAGE
         self._min_iou_threshold = DWI_IOU_THRESHOLD
         print("DWI model loaded")
+        return model
 
     def set_image_folder(self, folder_path):
         self._repository.set_image_folder(folder_path)
@@ -74,9 +79,9 @@ class Service(Subject):
             predictions["boxes"], predictions["labels"], predictions["scores"]
         ):
             score = float(score)
-            if self._model_type == T2_MODEL_TYPE:
+            if self._model_type == T2_IMAGE:
                 min_score = 0.2
-            elif self._model_type == DWI_MODEL_TYPE:
+            elif self._model_type == DWI_IMAGE:
                 min_score = 0.5
 
             if score < min_score:
@@ -100,7 +105,7 @@ class Service(Subject):
         print("finished plotting predictions")
         return image
 
-    def process_image(self, image_index):
+    def process_image(self, model, image_index):
         image = self._repository.get_dicom_image(image_index)
 
         # Prepare the inference image by bringing it to [0, 1],
@@ -122,17 +127,31 @@ class Service(Subject):
         inference_image = transform(inference_image)
 
         # Get predictions and plot them on the original image
-        predictions = self._model([inference_image])[0]
+        predictions = model([inference_image])[0]
         plotted_image = self._plot_predictions(image, predictions)
 
         return plotted_image
 
-    def process_all_images(self):
+    def load_model(self, image_type, task_type):
+        if image_type == T2_IMAGE and task_type == DETECTION_TASK:
+            return self.load_t2_detection_model()
+        elif image_type == DWI_IMAGE and task_type == DETECTION_TASK:
+            return self.load_dwi_detection_model()
+        elif image_type == T2_IMAGE and task_type == CLASSIFICATION_TASK:
+            raise NotImplementedError("T2 classification model not implemented yet.")
+        elif image_type == DWI_IMAGE and task_type == CLASSIFICATION_TASK:
+            raise NotImplementedError("DWI classification model not implemented yet.")
+        else:
+            raise ValueError(f"Invalid image type and task type combination.")
+
+    def process_all_images(self, image_type, task_type):
         if self._repository.output_folder_is_set() is False:
             raise ValueError("Output folder is not set. Please set it first.")
 
+        model = self.load_model(image_type, task_type)
+
         for i in range(len(self._repository)):
-            image = self.process_image(i)
+            image = self.process_image(model, i)
             self._repository.save_image_to_output_folder(image, i)
             self.notify_observers(
                 processed_image_count=i + 1, total_image_count=len(self._repository)

@@ -8,7 +8,7 @@ def catch_exceptions(func):
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except (ValueError, IndexError) as exception:
+        except (ValueError, IndexError, NotImplementedError) as exception:
             message_box = QMessageBox()
             message_box.setText(str(exception))
             message_box.exec()

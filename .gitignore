@@ -2,8 +2,10 @@ doodles.py
 
 # Project resources
 checkpoints/
-t2_sample/
-dwi_sample/
+t2_classification_sample/
+t2_detection_sample/
+dwi_classification_sample/
+dwi_detection_sample/
 output/
 
 # Byte-compiled / optimized / DLL files

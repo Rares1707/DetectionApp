@@ -19,7 +19,7 @@ from PySide6.QtCore import Qt
 from service import Service
 from utils.observer import Observer
 from utils.catch_exceptions_decorator import catch_exceptions
-from utils.project_constants import (
+from utils.project_config import (
     DETECTION_TASK,
     CLASSIFICATION_TASK,
     T2_IMAGE,
@@ -133,13 +133,13 @@ class MainWindow(QWidget, Observer):
     @override
     def refresh(self, **kwargs):
         processed_images_count = kwargs.get("processed_image_count")
-        total_image_count = kwargs.get("total_image_count")
+        total_image_to_process_count = kwargs.get("total_image_count")
 
-        if processed_images_count is None or total_image_count is None:
+        if processed_images_count is None or total_image_to_process_count is None:
             return
 
         self.status_label.setText(
-            f"Processing images... ({processed_images_count}/{total_image_count})"
+            f"Processing images... ({processed_images_count}/{total_image_to_process_count})"
         )
         QApplication.processEvents()
 
@@ -198,7 +198,7 @@ class MainWindow(QWidget, Observer):
 
         self._current_index = 0
         self.show_image()
-        self.next_btn.setEnabled(self._service.get_image_count() > 1)
+        self.next_btn.setEnabled(self._service.output_count() > 1)
         self.prev_btn.setEnabled(False)
 
     @catch_exceptions
@@ -216,16 +216,16 @@ class MainWindow(QWidget, Observer):
         )
 
         self.status_label.setText(
-            f"Done! Showing image {self._current_index + 1}/{self._service.get_image_count()}"
+            f"Done! Showing image {self._current_index + 1}/{self._service.output_count()}"
         )
 
     def show_next_image(self):
-        if self._current_index >= self._service.get_image_count() - 1:
+        if self._current_index >= self._service.output_count() - 1:
             return
         self._current_index += 1
         self.show_image()
         self.prev_btn.setEnabled(True)
-        if self._current_index == self._service.get_image_count() - 1:
+        if self._current_index == self._service.output_count() - 1:
             self.next_btn.setEnabled(False)
 
     def show_previous_image(self):

@@ -1,3 +1,5 @@
+DEVICE = "cpu"
+
 DETECTION_TASK = "object_detection"
 CLASSIFICATION_TASK = "classification"
 
@@ -33,3 +35,7 @@ T2_CLASSIFICATION_IMAGE_STD = [627.1960]
 DWI_CLASSIFICATION_MODEL = "checkpoints/dwi_classification_model.pth"
 DWI_CLASSIFICATION_IMAGE_MEAN = [122.3744]
 DWI_CLASSIFICATION_IMAGE_STD = [110.3508]
+
+# Classification required file names
+JPG_FOLDER = "jpg"
+DICOM_FOLDER = "dicom"

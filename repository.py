@@ -3,7 +3,7 @@ import os
 import cv2
 import pydicom
 
-from utils.project_config import JPG_FOLDER, DICOM_FOLDER
+from utils.project_config import JPG_FOLDER, DICOM_FOLDER, CSV_HEADER
 from utils.classification.data_preparation import (
     get_maps,
     parse_csv,
@@ -48,17 +48,17 @@ class Repository:
             raise ValueError("No DICOM files found in the input folder.")
         self._image_files.sort()
 
+    def csv_is_valid(self):
+        if self.csv_file is None or not os.path.isfile(self.csv_file):
+            return False
+
+        with open(self.csv_file, "r") as f:
+            header = f.readline().strip()
+            if header != CSV_HEADER:
+                return False
+        return True
+
     def prepare_input_files_for_classification(self):
-        self._image_files = []
-
-        self.dicom_directory = os.path.join(self._input_folder, DICOM_FOLDER)
-        if not os.path.isdir(self.dicom_directory):
-            raise ValueError(f"No dicom folder found, it must be named {DICOM_FOLDER}")
-
-        self.jpg_directory = os.path.join(self._input_folder, JPG_FOLDER)
-        if not os.path.isdir(self.jpg_directory):
-            raise ValueError(f"No jpg folder found, it must be named {JPG_FOLDER}")
-
         csv_files_found = [
             file
             for file in os.listdir(self._input_folder)
@@ -69,8 +69,23 @@ class Repository:
                 f"There should be exactly ONE csv file in the input folder. You provided: {len(csv_files_found)}"
             )
         self.csv_file = os.path.join(self._input_folder, csv_files_found[0])
+        if not self.csv_is_valid():
+            raise ValueError(
+                f"Error while parsing the CSV file, make sure the CSV file has the correct format."
+            )
+
+        self._image_files = []
+
+        self.dicom_directory = os.path.join(self._input_folder, DICOM_FOLDER)
+        if not os.path.isdir(self.dicom_directory):
+            raise ValueError(f"No dicom folder found, it must be named {DICOM_FOLDER}")
+
+        self.jpg_directory = os.path.join(self._input_folder, JPG_FOLDER)
+        if not os.path.isdir(self.jpg_directory):
+            raise ValueError(f"No jpg folder found, it must be named {JPG_FOLDER}")
 
         self.jpg_name_to_index, self.index_to_jpg_name = get_maps(self.jpg_directory)
+
         self.all_image_data = parse_csv(
             self.csv_file, self.jpg_directory, self.index_to_jpg_name
         )

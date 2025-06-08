@@ -165,7 +165,7 @@ class MainWindow(QWidget, Observer):
 
     @catch_exceptions
     def choose_input_folder(self):
-        """ "
+        """
         Careful, this method also starts the inference process.
         """
         folder_path = QFileDialog.getExistingDirectory(self, "Select input folder")

@@ -1,4 +1,5 @@
 DEVICE = "cpu"
+CSV_HEADER = "filename,file_size,file_attributes,region_count,region_id,region_shape_attributes,region_attributes"
 
 DETECTION_TASK = "object_detection"
 CLASSIFICATION_TASK = "classification"

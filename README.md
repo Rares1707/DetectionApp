@@ -1,6 +1,3 @@
 # DetectionApp
 
-This is my object detection app. 
-
-Command for generating the .exe file (you will find it in the dist/ file):
-pyinstaller --onefile --windowed main.py
+This is my bachelor thesis application. It is a simple application that can be used by radiologists to assist them in assessing cervical cancer spread. More details are available in my thesis. 
